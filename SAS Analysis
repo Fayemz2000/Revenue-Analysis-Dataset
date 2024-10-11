@@ -1,0 +1,127 @@
+Objective: Analyze the revenue trends of a company over time to identify any significant drops and correlate these drops with potential influencing factors, such as marketing spend, economic indicators, or seasonal effects.
+1. Import necessary libraries and load data
+* Import datasets
+libname mydata '/path/to/your/dataset'; /* Adjust the path accordingly */
+
+* Load revenue and marketing data
+data revenue_data;
+    infile 'mydata/revenue_data.csv' dlm=',' firstobs=2;
+    input Year Revenue Marketing_Spend Economic_Index Season;
+run;
+data marketing_data;
+    infile 'mydata/marketing_data.csv' dlm=',' firstobs=2;
+    input Year Marketing_Spend;
+run;
+
+* View the first few records
+proc print data=revenue_data(obs=5);
+run;
+proc print data=marketing_data(obs=5);
+run;
+
+Explanation:
+We define a library path using libname to point to the location of our datasets.
+We load the revenue and marketing data from CSV files using the data step and specify the delimiter.
+We then print the first few records to verify the data loading.
+
+2. Clean the data
+* Check for missing values
+proc means data=revenue_data n nmiss;
+run;
+proc means data=marketing_data n nmiss;
+run;
+
+* Impute missing values
+data revenue_data_clean;
+set revenue_data;
+if missing(Revenue) then Revenue = mean(Revenue);
+if missing(Marketing_Spend) then Marketing_Spend = mean(Marketing_Spend);
+run;
+
+* Merge datasets
+data combined_data;
+merge revenue_data_clean marketing_data;
+by Year;
+run;
+
+* Check for inconsistencies after merging
+proc print data=combined_data(obs=5);
+run;
+
+Explanation:
+I used proc means to check for missing values in the datasets.
+In the data step, we impute missing values with the mean of the respective columns.
+I then merge the revenue data with the marketing data using the merge statement, ensuring that the datasets are aligned by year.
+
+3. Exploratory Data Analysis (EDA) and Visualization
+* Visualizing revenue trends
+proc sgplot data=combined_data;
+series x=Year y=Revenue / lineattrs=(color=blue thickness=2) legendlabel="Revenue";
+series x=Year y=Marketing_Spend / lineattrs=(color=red thickness=2) legendlabel="Marketing Spend";
+xaxis label="Year";
+yaxis label="Amount";
+title "Revenue and Marketing Spend Over Time";
+run;
+
+* Seasonal trends
+proc sql;
+create table seasonal_trends as
+select Year, sum(Revenue) as Total_Revenue
+from combined_data
+group by Year;
+quit;
+proc sgplot data=seasonal_trends;
+vbar Year / response=Total_Revenue datalabel;
+xaxis label="Year";
+yaxis label="Total Revenue";
+title "Total Revenue by Year";
+run;
+
+Explanation:
+I visualized revenue trends over time using proc sgplot, plotting revenue and marketing spend on the same graph.
+A second plot shows seasonal trends, where we summarize total revenue by year using SQL and visualize it with a bar chart.
+
+4. Detect anomalies in revenue data
+* Calculate mean and standard deviation
+proc means data=combined_data noprint;
+var Revenue;
+output out=stats mean=mean_revenue std=std_revenue;
+run;
+
+* Detect anomalies based on standard deviation
+data anomalies;
+set combined_data;
+if abs(Revenue - mean_revenue) > (2 * std_revenue) then Anomaly_Flag = 1; /* Flag anomalies */
+else Anomaly_Flag = 0;
+run;
+
+* View anomalies
+proc print data=anomalies(where=(Anomaly_Flag=1));
+run;
+
+Explanation:
+I calculate the mean and standard deviation of the revenue using proc means.
+I flagged anomalies by creating a new variable Anomaly_Flag that checks if revenue deviates by more than two standard deviations from the mean.
+I print the rows with flagged anomalies to review.
+
+5. Correlate drops in revenue with other factors
+* Correlation analysis
+proc corr data=combined_data;
+var Revenue Marketing_Spend Economic_Index;
+run;
+
+* Regression analysis
+proc reg data=combined_data;
+model Revenue = Marketing_Spend Economic_Index;
+title "Regression Analysis of Revenue on Marketing Spend and Economic Index";
+run;
+
+Explanation:
+I used proc corr to analyze the correlation between revenue and other variables like marketing spend and economic index.
+I then perform a regression analysis using proc reg to determine the relationship between revenue and the influencing factors, providing insights into which variables impact revenue drops.
+
+Insights and recommendations
+Based on the analysis, here are some potential insights:
+Identified Revenue Drops: The findings indicate that certain years show significant drops in revenue (flagged by anomalies), talent and business leaders should investigate possible causes such as market conditions, competitive actions, or internal operational issues. Recommendation: Conduct in-depth analysis of those specific years to pinpoint root causes.
+Correlation with Marketing Spend: The findings indicate that if a strong negative correlation between revenue and marketing spend is identified, it may indicate inefficiencies in marketing strategies or misalignment with customer needs. Recommendation: Evaluate current marketing strategies and adjust based on performance metrics.
+Economic Indicators Impact: If economic indicators significantly affect revenue, it may signal that external economic conditions heavily influence performance. Recommendations: Business leaders should consider contingency plans to mitigate risks from economic downturns.
